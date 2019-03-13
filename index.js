@@ -123,7 +123,7 @@ io.on('connection', function(socket){
 		let timestamp = d.getHours() + ":" + d.getMinutes();
 
 		// Replace with a fromat string
-		chatlog.push("<li>" + timestamp + " " + "<span style=\"color:#" + msg.author.color +"\">" + msg.author.username + "</span> " + msg.content +"</li>");
+		chatlog.push("<li>" + timestamp + " " + "<span style=\"color:#" + msg.author.colour + ";\">" + msg.author.username + "</span> " + msg.content +"</li>");
 
 		// Send that message back to all connected sockets 
 		io.emit('update chatlog', {

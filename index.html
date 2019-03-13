@@ -2,18 +2,328 @@
 <html>
 <head>
 	<title>Chat App SENG513 - Wesley's Portfolio</title>
-	<link rel="stylesheet" type="text/css" href="chat.css">
-	<meta name="description" content="Assignment 2 for SENG 513. A chat app.">
+	<meta name="description" content="Assignment 3 for SENG 513. A chat app.">
 </head>
 <body>
+	<style type="text/css">* {
+	font-family:Verdana, Geneva, sans-serif;
+	margin: 1%;
+	padding: 0;
+	text-decoration: none;
+	font-weight: 200;
+	color: #e0e0e0;
+
+	border: 0px solid red;
+
+}
+
+body {
+	background-color: #3a475b;
+
+	display: flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+
+	justify-content: space-evenly;
+
+}
+
+ul {
+  list-style-type: none;
+}
+
+#messaging-area {
+	display: flex;
+	flex-direction: column;
+	flex-wrap: nowrap;
+
+	width: 80%;
+
+	justify-content: space-around;
+
+}
+
+#messages {
+	/*display: flex;
+	flex-direction: column-reverse;
+	flex-wrap: wrap-reverse;
+
+	align-items: flex-end;*/
+
+	overflow-y: scroll;
+	overflow-x: hidden;
+	overflow-wrap: break-word;
+
+	height: 80%;
+	width: 100%;
+
+	background-color: #5f6977;
+
+}
+
+ strong { font-weight: 900;} li {
+	width: 100%;
+}
+
+.message {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: nowrap;
+
+	align-items: flex-start;
+
+	flex: 0 0 100%;
+
+	width: 100%;
+
+
+	border: 1px solid red;
+
+	overflow-wrap: break-word;
+
+}
+
+.message-text {
+	overflow-wrap: break-word;
+}
+
+
+#input-box {
+	height: 5%;
+	width: 95%;
+
+	font-size: 1.5em;
+
+	background-color: #838c99;
+}
+
+#other-users {
+	margin-top: 3%;
+	padding-top: 2%;
+	text-align: center;
+	height: 80%;
+	background-color: #5f6977;
+}
+</style>
 	<div id="messaging-area">	
-			<ul id="messages"></ul>
+		<ul id="messages">
+		</ul>
+<!--		<div id="messages">
+			<div class="message">
+				<div class="author">Me1</div><div class="timestamp">Today</div>
+				<div class="message-text"><p>
+				</div>
+			</div>
+			<div class="message">
+				<tr>
+					<th class="timestamp">Firstname</th>
+					<th cla>Lastname</th> 
+					<th>Age</th>
+				</tr>
+			</div>
+		</div>-->
 		<form action="">
 			<input id="input-box" autocomplete="off" />
 		</form>
 	</div>
+	<div id="user-list">
+		<p id="user">Signed in as: </p>
+		<ul id= "other-users"></ul>
+	</div>
 </body>
 <script src="/socket.io/socket.io.js"></script>
 <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
-<script src="chat.js"></script>
+<script>
+	/*			SENG 513 CHAT APP 		*/
+
+//const BACKEND_URL = "http://localhost:3000";
+ const BACKEND_URL = "https://chitrchatr.glitch.me/";
+
+let user;
+let onlineUsers = [];
+
+function sanitize(message) {
+	// Removing all html tag brackets
+	return message.replace(/</g, "&lt").replace(/>/g, "&gt");
+}
+
+function setup(user){
+	// If the user did not previously have a cookie set, set it now
+	localStorage.setItem("session-token", user.id);
+
+	$('#user').append(user.username);
+
+	console.log("userid:" + user.id);
+}
+
+function setChatlog(chatlog){
+	console.log("Received chatlog: " + chatlog);
+
+	allMessages = "";
+
+	for (let i = 0; i < chatlog.length; i++){
+		allMessages += chatlog[i];
+	}
+
+	$('#messages').html(allMessages);
+}
+
+function setOnlineUsers(){
+	onlineUsers.sort();
+
+	allUsers = "";
+
+	for (let i = 0; i < onlineUsers.length; i++){
+		allUsers += "<li>" + onlineUsers[i] + "</li>";
+	}
+
+	console.log(onlineUsers);
+
+	$('#other-users').html(allUsers);
+}
+
+function setUserName(name, socket){
+	user.username = name;
+
+	$('#user').text("Signed in as: " + name);
+
+	socket.emit('user update', user);
+}
+
+function setColor(colour, socket){
+	user.colour = colour;
+	console.log(colour);
+
+	socket.emit('user update', user);
+}
+
+function addMessage(author, timestamp, content){
+	if (author) {
+
+		console.log("Adding message");
+
+		if (author.id === user.id)
+			$('#messages').append("<li>" + timestamp + " " + "<strong style=\"color:#" + author.colour + ";\">" + author.username + "</strong> " + content +"</li>");
+		
+		else // DONT USE SPAN INT EH REAL THING LOL
+			$('#messages').append("<li>" + timestamp + " " + "<span style=\"color:#" + author.colour + ";\">" + author.username + "</span> " + content +"</li>");
+		}
+	else {
+		// If no user is given, then we assume it was a system generated message
+
+		//todo gen special message
+
+	}
+}
+
+// (Using jquery) Once the doc is ready, execute the following code
+$(function () {
+	// not specifying any URL defaults to trying to connect to the host that serves the page.
+	// Connect to url
+	let socket = io(BACKEND_URL);
+
+	let token = localStorage.getItem("session-token");
+	if (token !== "") {
+		console.log("user exists, token:" + token);
+		socket.emit('user login', token);
+	} else {
+		console.log("no token, creating new user");
+		socket.emit('create user');
+	}
+
+	// Find the form and do the following when the user hits enter
+	$('form').submit(function(e){
+	  	e.preventDefault(); // prevents page reloading
+
+	  	if ($('#input-box').val().length === 0) return;
+
+	  	let message = sanitize($('#input-box').val());
+
+
+	  	if (message[0].charAt(0) === "/") {
+		// Retrieve input 
+		let inp = message.substring(1, message.length);
+		let inpArray = inp.split(" ");
+
+		switch (inpArray[0]) {
+			case "nick":
+				console.log("Attempting to change username");
+				if (inpArray.length < 2) {
+					// addMessage(null, null, "Please provide the username you wish to switch to.");
+					alert("Please provide the username you wish to switch to.");
+				}
+				else {
+					if (inpArray[1].length > 20){
+						// addMessage(null, null, "Username must be shorter than 21 characters");
+						alert("Username must be shorter than 21 characters");
+					}
+					else if (inpArray[1].length < 1){
+						// addMessage(null, null, "Invalid username, cannot be whitespace");
+						alert("Invalid username, cannot be whitespace");
+					}
+					else {
+						setUserName(inpArray[1], socket);
+					}
+				}
+				
+				break;
+			case "nickcolour":
+				if (inpArray.length < 2) {
+					alert("Please provide the colour you wish to switch to.");
+				}
+				else {
+					setColor(inpArray[1], socket);
+				}
+				break;
+			}
+		}
+		else {
+
+			console.log("Sending new message to server: " + message);
+
+		  // Send the message to the server
+		  socket.emit('new chat msg', {
+		  	"author": user,
+		  	"content": message
+		  });
+		}
+
+		// Clear the form
+		$('#input-box').val('');
+		return false;
+	});
+
+	socket.on('user authed', function(chatState){
+
+		console.log("User authed");
+
+		user = chatState.user;
+
+		setChatlog(chatState.chatlog);
+
+		onlineUsers = chatState.onlineUsers;
+
+		setOnlineUsers();
+
+		setup(user);
+		
+	});
+
+
+	socket.on('update chatlog', function(msg){
+		console.log("MEssage received from server" + msg.content);
+
+		addMessage(msg.author, msg.timestamp, msg.content);
+	});
+
+	socket.on('userlist update', function(userlist){
+		console.log("Userlist updated");
+
+		onlineUsers = userlist;
+
+		setOnlineUsers();
+	});
+
+});
+</script>
 </html>
